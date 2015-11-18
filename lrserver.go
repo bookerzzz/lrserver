@@ -22,5 +22,6 @@ package lrserver
 
 const (
 	DefaultName string = "LiveReload"
+	DefaultHost string = ""
 	DefaultPort uint16 = 35729
 )

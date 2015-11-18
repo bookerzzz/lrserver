@@ -512,7 +512,7 @@ const js string = `(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=
   exports.Options = Options = (function() {
     function Options() {
       this.https = false;
-      this.host = null;
+      this.host = "%s";
       this.port = %d;
       this.snipver = null;
       this.ext = null;

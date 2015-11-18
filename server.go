@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
 
 type Server struct {
 	name      string
+	host      string
 	port      uint16
 	server    *http.Server
 	conns     connSet
@@ -21,7 +23,8 @@ type Server struct {
 	liveCSS   bool
 }
 
-func New(name string, port uint16) (*Server, error) {
+// New ...
+func New(name string, host string, port uint16) (*Server, error) {
 	// Create router
 	router := http.NewServeMux()
 
@@ -30,6 +33,8 @@ func New(name string, port uint16) (*Server, error) {
 	// Create server
 	s := &Server{
 		name: name,
+		host: host,
+		port: port,
 		server: &http.Server{
 			Handler:  router,
 			ErrorLog: log.New(os.Stderr, logPrefix, 0),
@@ -38,7 +43,6 @@ func New(name string, port uint16) (*Server, error) {
 		statusLog: log.New(os.Stdout, logPrefix, 0),
 		liveCSS:   true,
 	}
-	s.setPort(port)
 
 	// Handle JS
 	router.HandleFunc("/livereload.js", jsHandler(s))
@@ -51,20 +55,18 @@ func New(name string, port uint16) (*Server, error) {
 
 func (s *Server) ListenAndServe() error {
 	// Create listener
-	l, err := net.Listen("tcp", makeAddr(s.port))
+	l, err := net.Listen("tcp", s.Addr())
 	if err != nil {
 		return err
 	}
 
 	// Set assigned port if necessary
 	if s.port == 0 {
-		port, err := makePort(l.Addr().String())
-		if err != nil {
-			return err
-		}
-
-		s.setPort(port)
+		addr := strings.Split(l.Addr().String(), ":")
+		port, _ := strconv.ParseUint(addr[1], 10, 16)
+		s.host, s.port = addr[0], uint16(port)
 	}
+	s.js = fmt.Sprintf(js, s.host, s.port)
 
 	s.logStatus("listening on " + s.server.Addr)
 	return s.server.Serve(l)
@@ -89,6 +91,16 @@ func (s *Server) Alert(msg string) {
 // Name gets the server name
 func (s *Server) Name() string {
 	return s.name
+}
+
+// Addr get the host:port that the server is listening on
+func (s *Server) Addr() string {
+	return fmt.Sprintf("%s:%d", s.Host(), s.Port())
+}
+
+// Host gets the host that the server is listening on
+func (s *Server) Host() string {
+	return s.host
 }
 
 // Port gets the port that the server is listening on
@@ -128,15 +140,6 @@ func (s *Server) SetStatusLog(l *log.Logger) {
 // which can be set to nil
 func (s *Server) SetErrorLog(l *log.Logger) {
 	s.server.ErrorLog = l
-}
-
-func (s *Server) setPort(port uint16) {
-	s.port = port
-	s.server.Addr = makeAddr(port)
-
-	if port != 0 {
-		s.js = fmt.Sprintf(js, s.port)
-	}
 }
 
 func (s *Server) newConn(wsConn *websocket.Conn) {
